@@ -1,0 +1,11 @@
+# Données brutes volumineuses (78 Mo) — non versionnées. Voir README pour la source.
+data/dpt2020.csv
+
+# Caches / divers
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+
+# Config locale Claude Code
+.claude/
