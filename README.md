@@ -19,7 +19,7 @@ chacune à un jeu de questions.
 
 | Fichier | Question | Description |
 |---|---|---|
-| [`output/viz1_bulles.html`](output/viz1_bulles.html) | **Évolution dans le temps** | Nuage de bulles animé : longévité (Top 100) vs année du pic, taille = naissances (sexes agrégés, pas d'encodage du sexe). Slider « Année », filtres Top n et « Suivre un prénom ». |
+| [`output/viz1_bulles.html`](output/viz1_bulles.html) | **Évolution dans le temps** | Nuage de bulles animé : longévité (Top 100) vs année du pic, taille = naissances. Slider « Année », filtres Top n et « Suivre un prénom ». |
 | [`output/viz2_sunburst_2.html`](output/viz2_sunburst_2.html) | **Effet régional** | Graphe radial par prénom : secteurs d'égale largeur en ordre pseudo-géographique, longueur = popularité locale rapportée au national (×national), cercle de référence ×1. Sélecteur de prénom + slider décennie. |
 | [`output/viz2_sunburst_1.html`](output/viz2_sunburst_1.html) | **Effet régional (contexte)** | Vue complémentaire : sunburst région → département des naissances (poids démographique). Slider « Décennie », survol pour isoler une région. |
 | [`output/viz3_violon.html`](output/viz3_violon.html) | **Effet de genre** | Violons split garçons/filles par prénom mixte : distribution des naissances dans le temps, un violon par prénom (moitiés décalées = bascule de genre). |
