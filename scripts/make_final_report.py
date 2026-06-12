@@ -66,29 +66,42 @@ doc.add_paragraph(
 )
 sub("What it shows")
 doc.add_paragraph(
-    "An animated bubble cloud. Each bubble is a name in the selected year. The X-axis is the "
-    "name's peak year, the Y-axis is its longevity (number of years it stayed in the national "
-    "Top 100), bubble size is the number of births that year, and color encodes sex. The "
-    "“Year” slider scrubs through 1900–2020; the giant year label and the moving, "
-    "growing bubbles make the evolution tangible."
+    "An animated bubble cloud. Each bubble is a name in the selected year: the X-axis is the "
+    "name's peak year, the Y-axis is its longevity (the number of years it stayed in the national "
+    "Top 100), and bubble area is the number of births that year, on a fixed scale so sizes stay "
+    "comparable from one year to the next. Names are pooled regardless of sex — one bubble per "
+    "name — since the questions concern names, not the child's sex. The year selector is the "
+    "X-axis itself: a handle slides along the time axis (or the ▶ button plays the years in "
+    "sequence), while the giant year label and the moving, growing bubbles make the evolution "
+    "tangible and a dashed ghost ring recalls each bubble's size the year before. Two filters "
+    "sharpen the reading — a “Top n” slider (1–100) thins the cloud from the headline names down "
+    "to the long tail, and a “Follow a name” box highlights one name, fading the rest and drawing "
+    "its full 1900–2020 births curve above the chart."
 )
 img("sketches/viz1_bulles_preview.png", 6.2)
 sub("Why it is appropriate and effective")
 bullets([
     "Consistent vs brief popularity is read directly off the vertical axis: long-lived classics "
     "sit high (e.g. Marie), short-lived fads sit low — answering the core question by position.",
+    "Following a name draws its births curve over the whole century, so the shape settles the "
+    "question at a glance: a broad plateau is an enduring favourite, a single narrow spike a "
+    "passing fad (e.g. Brigitte around 1960, Kevin around 1990).",
     "Temporal trends emerge from scrubbing: the cloud drifts rightward over the century and names "
     "are replaced faster in recent decades, making accelerating turnover visible.",
     "Sudden popularity is shown by a bubble that appears and inflates rapidly as the slider "
     "advances, while its low longevity keeps it near the bottom.",
-    "Bubble size preserves absolute magnitude (births), so rank and volume are not confused.",
-    "Hover tooltips give the exact name, sex, births, peak year and longevity for detail on demand.",
+    "The “Top n” filter controls clutter: a low n isolates the dominant names, a high n exposes "
+    "the churn of the long tail without changing the layout.",
+    "Hover tooltips give the exact name, births, rank within the year, peak year and longevity "
+    "for detail on demand.",
 ])
 sub("Key points to demonstrate (screenshots / video)")
 bullets([
     "Snapshots at 1905, 1965 and 2015 to show how the set of names turns over.",
-    "A long-lived name high on the axis (Marie/Jean) vs a brief fad low on the axis.",
-    "A short clip dragging the slider to show the cloud shifting and bubbles growing.",
+    "A long-lived name high on the axis (Marie/Jean) versus a brief fad low on the axis.",
+    "“Follow a name” on a fad to reveal its sharp, isolated births curve — e.g. Brigitte (a 1960s "
+    "spike) or Camille (a telling bimodal curve once its two eras are pooled).",
+    "A short clip dragging the slider along the axis to show the cloud shifting and bubbles growing.",
 ])
 
 # ============================================================
