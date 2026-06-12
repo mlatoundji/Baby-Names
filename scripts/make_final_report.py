@@ -115,7 +115,7 @@ doc.add_paragraph(
     "popularity) and a decade slider drive the chart; region codes label the ring and are repeated "
     "with full names in the legend."
 )
-img("sketches/viz2_radial_demo_ewen.png", 6.0)
+img("sketches/viz2_sunburst_2_demo_ewen.png", 6.0)
 sub("Why it is appropriate and effective")
 bullets([
     "Frequency-normalized length removes the population-size bias: Paris (75) is no longer "
@@ -137,7 +137,7 @@ doc.add_paragraph(
     "‘how big is each region’ overview; the radial chart is the ‘where is this name "
     "over-represented’ detail."
 )
-img("sketches/viz2_sunburst_preview.png", 4.4)
+img("sketches/viz2_sunburst_1_preview.png", 4.4)
 sub("Key points to demonstrate (screenshots / video)")
 bullets([
     "Radial chart with a regional name (EWEN/JORDI/MAYLIS) — western/southern sectors past the circle.",
@@ -155,27 +155,32 @@ doc.add_paragraph(
 )
 sub("What it shows")
 doc.add_paragraph(
-    "A heatmap of unisex names (rows) by decade (columns), colored by the female share on a "
-    "diverging scale (blue = mostly boys, orange = mostly girls, pale = balanced). Clicking a name "
-    "opens, on the right, its year-by-year female-share curve with a dashed 50% reference line."
+    "Split violin plots — one per unisex name. Each violin shows the distribution of births over "
+    "time (vertical axis = year): the left half (blue) is boys, the right half (orange) is girls, "
+    "and the width at each year is the number of births that year for that sex. Names are ordered "
+    "from the most male-leaning to the most female-leaning, and hovering a name highlights its "
+    "violin."
 )
-img("sketches/viz3_genre_preview.png", 6.2)
+img("sketches/viz3_violon_preview.png", 6.4)
 sub("Why it is appropriate and effective")
 bullets([
     "It focuses on unisex names — the only names for which a gender question is meaningful — "
     "so the view is on-topic by construction.",
-    "Whether a name evolves consistently is read along each row: a row that stays one color is "
-    "stable, a row that changes from blue to orange has flipped sex over time (e.g. Camille).",
-    "The diverging palette centered at 50% makes ‘mostly boys’, ‘balanced’ and "
-    "‘mostly girls’ instantly distinguishable across many names at once.",
-    "The linked line chart gives the precise trajectory: when it crosses 50% and whether the shift "
-    "is gradual or abrupt — the exact ‘consistent evolution?’ answer.",
+    "A gender flip is read directly from the shape: when the blue and orange halves are offset "
+    "vertically, the name was given to one sex in one era and the other sex later (e.g. Camille — "
+    "a little blue early, a large orange bulge recently).",
+    "Consistent evolution shows as two halves that rise and fall together over the same years; an "
+    "inconsistent / shifting name shows halves peaking in different decades.",
+    "Putting all names side by side, ordered by overall female share, turns the whole set of "
+    "unisex names into one comparable small-multiples panel.",
+    "Width = births per year, so each violin also conveys when the name was actually in use, not "
+    "just its balance.",
 ])
 sub("Key points to demonstrate (screenshots / video)")
 bullets([
-    "The heatmap overview showing several names that flip color over the decades.",
-    "Clicking Camille (or Dominique) to reveal the curve crossing the 50% line mid-century.",
-    "A name that stays one color throughout as a stable counter-example.",
+    "The full panel, showing names ranging from male-dominated (left) to female-dominated (right).",
+    "A flipped name (Camille, Alix) whose blue and orange halves sit in different eras.",
+    "A name used for both sexes in the same period (Dominique) as a balanced counter-example.",
 ])
 
 # ---- closing ----
@@ -183,7 +188,7 @@ h1("Summary")
 doc.add_paragraph(
     "Each visualization is matched to its question through a deliberate encoding: longevity on an "
     "axis for time, a frequency-normalized radial chart with a national reference circle (plus a "
-    "sunburst for demographic context) for region, and a diverging female-share heatmap for "
+    "sunburst for demographic context) for region, and split male/female violins over time for "
     "gender. All three follow the same overview + detail-on-demand pattern (slider / hover / "
     "linked view) and share a consistent, accessible color language."
 )

@@ -46,7 +46,7 @@ chart = (arcs + labels).properties(
         anchor="start", fontSize=18),
 ).configure_view(stroke=None)
 
-chart.save("output/viz2_sunburst_interactif.html")
-print("OK viz2_sunburst_interactif.html")
-chart.save("sketches/viz2_sunburst_preview.png", scale_factor=1.5)
-print("OK viz2_sunburst_preview.png")
+chart.save("output/viz2_sunburst_1.html")
+print("OK viz2_sunburst_1.html")
+chart.save("sketches/viz2_sunburst_1_preview.png", scale_factor=1.5)
+print("OK viz2_sunburst_1_preview.png")

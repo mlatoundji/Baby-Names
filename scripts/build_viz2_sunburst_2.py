@@ -181,7 +181,7 @@ chart = (bars + ref_outline + reglabels).properties(
         anchor="start", fontSize=16),
 ).configure_view(stroke=None)
 
-chart.save("output/viz2_radial_prenom.html")
-print("OK output/viz2_radial_prenom.html | prénoms:", len(opts), "| lignes:", len(nd))
-chart.save("sketches/viz2_radial_preview.png", scale_factor=2.6)
-print("OK sketches/viz2_radial_preview.png")
+chart.save("output/viz2_sunburst_2.html")
+print("OK output/viz2_sunburst_2.html | prénoms:", len(opts), "| lignes:", len(nd))
+chart.save("sketches/viz2_sunburst_2_preview.png", scale_factor=2.6)
+print("OK sketches/viz2_sunburst_2_preview.png")
