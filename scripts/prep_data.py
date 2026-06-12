@@ -16,30 +16,33 @@ DNAME = {f["properties"]["code"]: f["properties"]["nom"]
 DNAME["20"] = "Corse"
 
 # ============================================================
-# (1) NUAGE DE BULLES — niveau national
+# (1) NUAGE DE BULLES — niveau national, prénom sans distinction de sexe
 # ============================================================
-nat = raw.groupby(["sexe", "preusuel", "annais"], as_index=False).nombre.sum()
-# longévité = nb d'années passées dans le Top 100 national (par sexe)
-nat["rank"] = nat.groupby(["sexe", "annais"]).nombre.rank(ascending=False, method="min")
-longevity = (nat[nat["rank"] <= 100].groupby(["sexe", "preusuel"]).annais.nunique()
+# Le sexe n'est pas une variable de la viz : un prénom = une bulle. Les rares
+# prénoms donnés aux deux sexes (Camille, Claude, Dominique, Marie) sont fusionnés.
+nat = raw.groupby(["preusuel", "annais"], as_index=False).nombre.sum()
+# longévité = nb d'années passées dans le Top 100 national (tous prénoms confondus)
+nat["rank"] = nat.groupby("annais").nombre.rank(ascending=False, method="min")
+longevity = (nat[nat["rank"] <= 100].groupby("preusuel").annais.nunique()
              .rename("longevity").reset_index())
-agg = nat.groupby(["sexe", "preusuel"]).nombre.sum().rename("total").reset_index()
-peak = (nat.loc[nat.groupby(["sexe", "preusuel"]).nombre.idxmax(),
-                ["sexe", "preusuel", "annais"]].rename(columns={"annais": "peak_year"}))
-names = agg.merge(longevity, on=["sexe", "preusuel"]).merge(peak, on=["sexe", "preusuel"])
-names["id"] = names.sexe + "·" + names.preusuel
+agg = nat.groupby("preusuel").nombre.sum().rename("total").reset_index()
+peak = (nat.loc[nat.groupby("preusuel").nombre.idxmax(),
+                ["preusuel", "annais"]].rename(columns={"annais": "peak_year"}))
+names = agg.merge(longevity, on="preusuel").merge(peak, on="preusuel")
+names["id"] = names.preusuel
 top = names.sort_values("total", ascending=False).head(250).copy()
 top.to_csv("data/data_viz1_bubbles.csv", index=False)
 
-# séries année par année de ces prénoms (taille animée + filtrage)
-ts = nat.merge(top[["sexe", "preusuel", "id", "longevity", "peak_year"]],
-               on=["sexe", "preusuel"])
-# pour chaque année, garder les ~30 prénoms les plus donnés (nuage lisible)
-ts["yr_rank"] = ts.groupby("annais").nombre.rank(ascending=False, method="min")
-ts = ts[ts.yr_rank <= 30]
-ts = ts[["id", "sexe", "preusuel", "annais", "nombre", "longevity", "peak_year"]]
+# séries année par année : top 100 national de chaque année,
+# pour le filtre « Top 1-100 » côté client (le rang = position dans l'année)
+ts = nat.copy()
+ts["yr_rank"] = ts.groupby("annais").nombre.rank(ascending=False, method="first")
+ts = ts[ts.yr_rank <= 100]
+ts = ts.merge(longevity, on="preusuel").merge(peak, on="preusuel")
+ts["id"] = ts.preusuel
+ts = ts[["id", "preusuel", "annais", "nombre", "longevity", "peak_year"]]
 ts.to_csv("data/data_viz1_anim.csv", index=False)
-print("Viz1 bubbles:", len(top), "| anim rows:", len(ts))
+print("Viz1 bubbles:", len(top), "| anim rows:", len(ts), "| prénoms:", ts.id.nunique())
 
 # ============================================================
 # (2) SUNBURST région → département (par décennie)

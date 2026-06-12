@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Viz 1 — Nuage de bulles « longévité des prénoms » (maquette v2).
+"""Viz 1 — Nuage de bulles « longévité des prénoms » (maquette v2 + filtres).
 
 Génère output/viz1_bulles.html : page autonome D3.js fidèle à
 sketches/viz1-nuage_de_bulles_v2.png :
@@ -11,7 +11,17 @@ sketches/viz1-nuage_de_bulles_v2.png :
   - bouton « Lecture année par année » (animation), flèches ← → au clavier ;
   - cercle pointillé = taille de la bulle l'année précédente.
 
-Usage : python scripts/build_viz1.py
+Filtres (barre au-dessus du graphique) :
+  - mini-slider « TOP n » : ne garder que les n prénoms les plus donnés
+    de l'année (1 à 100) ;
+  - champ « Suivre un prénom… » (liste déroulante avec recherche) : met le
+    prénom en évidence (terracotta), estompe le reste, affiche sa courbe de
+    naissances 1900-2020 et le garde visible même hors du Top n.
+    Cliquer une bulle suit aussi son prénom ; Échap ou ✕ pour quitter.
+
+Vue partageable par l'ancre d'URL : viz1_bulles.html#annee=1964&top=50&nom=Brigitte
+
+Usage : python scripts/build_viz1.py   (après scripts/prep_data.py)
 """
 import json
 from pathlib import Path
@@ -19,23 +29,27 @@ from pathlib import Path
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-YEAR0 = 1985  # année affichée à l'ouverture, comme sur la maquette
+YEAR0 = 1985   # année affichée à l'ouverture, comme sur la maquette
+TOP0 = 30      # filtre Top n par défaut (densité de la maquette)
 
 # ------------------------------------------------------------------ données
 df = pd.read_csv(ROOT / "DATA" / "data_viz1_anim.csv")
 
-# payload compact : 1 entrée par prénom (x, y fixes) + {année: [[id, naissances]]}
-uniq = df.drop_duplicates(subset=["sexe", "preusuel"]).reset_index(drop=True)
-idx = {(r.sexe, r.preusuel): i for i, r in enumerate(uniq.itertuples(index=False))}
+# prénoms ordonnés par popularité cumulée (ordre des suggestions du dropdown)
+totals = df.groupby("preusuel", as_index=False).nombre.sum()
+meta = df.drop_duplicates(subset="preusuel")[["preusuel", "longevity", "peak_year"]]
+uniq = (totals.sort_values("nombre", ascending=False)
+        .merge(meta, on="preusuel").reset_index(drop=True))
+idx = {r.preusuel: i for i, r in enumerate(uniq.itertuples(index=False))}
 
+# payload compact : 1 entrée par prénom (x, y fixes) + {année: [[id, naissances]]}
 payload = {
     "names": [
-        {"n": str(r.preusuel).title(), "s": r.sexe,
-         "l": int(r.longevity), "p": int(r.peak_year)}
+        {"n": str(r.preusuel).title(), "l": int(r.longevity), "p": int(r.peak_year)}
         for r in uniq.itertuples(index=False)
     ],
     "years": {
-        int(y): [[idx[(r.sexe, r.preusuel)], int(r.nombre)]
+        int(y): [[idx[r.preusuel], int(r.nombre)]
                  for r in g.sort_values("nombre", ascending=False).itertuples(index=False)]
         for y, g in df.groupby("annais")
     },
@@ -56,10 +70,24 @@ TEMPLATE = r"""<!DOCTYPE html>
 :root{
   --bg:#F6F3EB; --ink:#1E1D1A; --muted:#8F897C; --grid:#E8E4D7;
   --bubble:#92B0D3; --ghost:#B3AC9B; --soft:#6F6A5E;
+  --accent:#D9714E; --accent-d:#A04A2B;
 }
 html,body{margin:0;background:var(--bg);}
 body{font-family:"Segoe UI",-apple-system,"Helvetica Neue",Arial,sans-serif;color:var(--ink);}
-#wrap{position:relative;max-width:1500px;margin:0 auto;padding:10px 18px 24px;}
+#wrap{position:relative;max-width:1500px;margin:0 auto;padding:6px 18px 24px;}
+#bar{display:flex;justify-content:flex-end;align-items:center;gap:30px;
+     flex-wrap:wrap;padding:12px 6px 2px;font-size:13px;color:var(--soft);}
+#bar .lab{letter-spacing:.2em;font-weight:600;font-size:11.5px;color:var(--muted);}
+#bar .ctl{display:flex;align-items:center;gap:10px;}
+#topn{width:150px;accent-color:var(--ink);}
+#topnv{font-weight:700;color:var(--ink);min-width:2.2em;}
+#who{background:transparent;border:none;border-bottom:1px solid #C9C3B2;
+     padding:4px 2px;font:inherit;font-size:13px;color:var(--ink);width:210px;outline:none;}
+#who:focus{border-bottom-color:var(--ink);}
+#who::placeholder{color:var(--muted);}
+#clear{background:none;border:none;color:var(--muted);cursor:pointer;
+       font-size:15px;padding:2px 5px;visibility:hidden;}
+#clear:hover{color:var(--ink);}
 svg{display:block;width:100%;height:auto;user-select:none;}
 text{font-family:inherit;}
 .lbl{pointer-events:none;}
@@ -76,13 +104,25 @@ text{font-family:inherit;}
 </head>
 <body>
 <div id="wrap">
+  <div id="bar">
+    <div class="ctl" title="Ne garder que les n prénoms les plus donnés de l'année">
+      <span class="lab">TOP</span>
+      <input type="range" id="topn" min="1" max="100" step="1" value="__TOP0__"
+             aria-label="Nombre de prénoms affichés (top n de l'année)">
+      <span id="topnv">__TOP0__</span>
+    </div>
+    <div class="ctl">
+      <input id="who" list="dl" placeholder="Suivre un prénom…" autocomplete="off"
+             aria-label="Mettre un prénom en évidence">
+      <datalist id="dl"></datalist>
+      <button id="clear" title="Ne plus suivre (Échap)">✕</button>
+    </div>
+  </div>
   <svg id="viz" role="img" aria-label="Nuage de bulles : longévité des prénoms en France, année par année"></svg>
   <div id="tt"></div>
 </div>
 <script>
 const DATA=__DATA__;
-/* année d'ouverture : modifiable via l'ancre d'URL, p. ex. viz1_bulles.html#1950 */
-const Y0=(h=>h>=DATA.yearMin&&h<=DATA.yearMax?h:__YEAR0__)(+location.hash.slice(1));
 
 /* ---- géométrie (viewBox fixe, page fluide) ---- */
 const W=1500,H=880,ML=110,MR=40,MT=170,PB=690,SY=780,FY=852;
@@ -91,7 +131,27 @@ const x=d3.scaleLinear().domain([DATA.yearMin,DATA.yearMax]).range([X0,X1]);
 const y=d3.scaleLinear().domain([0,122]).range([PB,MT]);
 const r=d3.scaleSqrt().domain([0,DATA.maxN]).range([0,95]);   // aire ∝ naissances, comparable d'une année à l'autre
 const fmt=new Intl.NumberFormat("fr-FR");
-let year=Y0,timer=null;
+
+/* ---- état + ancre d'URL partageable ---- */
+const label=i=>DATA.names[i].n;
+const byName=new Map(DATA.names.map((d,i)=>[d.n.toLowerCase(),i]));
+function resolveName(s){
+  s=(s||"").trim().toLowerCase();
+  return s&&byName.has(s)?byName.get(s):null;
+}
+let year=__YEAR0__,topN=__TOP0__,focusI=null,timer=null;
+(()=>{ // #1950 (forme courte) ou #annee=1950&top=50&nom=Marie
+  const h=location.hash.slice(1);
+  if(/^\d{4}$/.test(h)){const v=+h;if(v>=DATA.yearMin&&v<=DATA.yearMax)year=v;return;}
+  const p=new URLSearchParams(h);
+  const a=+p.get("annee");if(a>=DATA.yearMin&&a<=DATA.yearMax)year=a;
+  const t=+p.get("top");if(t>=1&&t<=100)topN=t;
+  focusI=resolveName(p.get("nom"));
+})();
+function writeHash(){
+  const s=`annee=${year}&top=${topN}`+(focusI!=null?`&nom=${encodeURIComponent(label(focusI))}`:"");
+  history.replaceState(null,"","#"+s);
+}
 
 const svg=d3.select("#viz").attr("viewBox",`0 0 ${W} ${H}`);
 const wrap=document.getElementById("wrap"),tt=document.getElementById("tt");
@@ -113,7 +173,7 @@ svg.append("text").attr("x",X1).attr("y",48).attr("text-anchor","end")
    .attr("fill","var(--muted)").text("ANNÉE");
 const bigYear=svg.append("text").attr("x",X1).attr("y",140).attr("text-anchor","end")
    .attr("font-size",104).attr("font-weight",800).attr("letter-spacing","-0.02em")
-   .attr("fill","var(--ink)").text(Y0);
+   .attr("fill","var(--ink)").text(year);
 
 /* ---- calques (bulles sous les pointillés, étiquettes au-dessus) ---- */
 const layerB=svg.append("g"),layerG=svg.append("g"),layerL=svg.append("g");
@@ -121,6 +181,47 @@ const layerB=svg.append("g"),layerG=svg.append("g"),layerL=svg.append("g");
 /* titre d'axe par-dessus les bulles : Marie déborde en haut à gauche vers 1900-1915 */
 svg.append("text").attr("x",26).attr("y",84).attr("font-size",22)
    .attr("font-weight",700).text("Longévité");
+
+/* ---- courbe du prénom suivi (mode focus) ---- */
+const SX0=360,SW=400,SH=88,SB=SH-20;
+const spark=svg.append("g").attr("transform",`translate(${SX0},28)`).attr("opacity",0)
+   .style("pointer-events","none");
+const sparkX=d3.scaleLinear().domain([DATA.yearMin,DATA.yearMax]).range([0,SW]);
+spark.append("line").attr("x1",0).attr("x2",SW).attr("y1",SB).attr("y2",SB)
+   .attr("stroke","var(--muted)").attr("stroke-width",1);
+spark.append("text").attr("x",0).attr("y",SB+15).attr("font-size",10.5)
+   .attr("fill","var(--muted)").text(DATA.yearMin);
+spark.append("text").attr("x",SW).attr("y",SB+15).attr("text-anchor","end")
+   .attr("font-size",10.5).attr("fill","var(--muted)").text(DATA.yearMax);
+const sparkTitle=spark.append("text").attr("x",0).attr("y",6).attr("font-size",12.5)
+   .attr("font-weight",700).attr("letter-spacing",".08em").attr("fill","var(--accent-d)");
+const sparkInfo=spark.append("text").attr("x",SW).attr("y",6).attr("text-anchor","end")
+   .attr("font-size",11.5).attr("fill","var(--soft)");
+const sparkArea=spark.append("path").attr("fill","var(--accent)").attr("opacity",.14);
+const sparkLine=spark.append("path").attr("fill","none")
+   .attr("stroke","var(--accent)").attr("stroke-width",1.7);
+const sparkDot=spark.append("circle").attr("r",3.6).attr("fill","var(--accent-d)");
+let sparkFor=null,sparkSeries=null,sparkY=null;
+function drawSpark(){
+  if(focusI==null){spark.attr("opacity",0);sparkFor=null;return;}
+  if(sparkFor!==focusI){
+    sparkSeries=d3.range(DATA.yearMin,DATA.yearMax+1).map(yy=>{
+      const e=(DATA.years[yy]||[]).find(a=>a[0]===focusI);
+      return e?e[1]:null;
+    });
+    sparkY=d3.scaleLinear().domain([0,d3.max(sparkSeries)]).range([SB,16]);
+    const ix=i=>sparkX(DATA.yearMin+i),ok=v=>v!=null;
+    sparkArea.attr("d",d3.area().defined(ok).x((v,i)=>ix(i)).y0(SB).y1(v=>sparkY(v))(sparkSeries));
+    sparkLine.attr("d",d3.line().defined(ok).x((v,i)=>ix(i)).y(v=>sparkY(v))(sparkSeries));
+    sparkTitle.text(DATA.names[focusI].n.toUpperCase());
+    sparkFor=focusI;
+  }
+  const v=sparkSeries[year-DATA.yearMin];
+  sparkDot.attr("opacity",v!=null?1:0);
+  if(v!=null)sparkDot.attr("cx",sparkX(year)).attr("cy",sparkY(v));
+  sparkInfo.text(v!=null?`${year} : ${fmt.format(v)} naissances`:`${year} : hors top 100`);
+  spark.attr("opacity",1);
+}
 
 /* ---- slider posé sur l'axe des abscisses ---- */
 const slider=svg.append("g");
@@ -132,7 +233,7 @@ d3.range(DATA.yearMin,DATA.yearMax+1,40).forEach(t=>{
 });
 const overlay=slider.append("rect").attr("x",X0-16).attr("width",X1-X0+32)
       .attr("y",SY-24).attr("height",48).attr("fill","transparent").style("cursor","pointer");
-const handle=slider.append("circle").attr("cx",x(Y0)).attr("cy",SY).attr("r",10.5)
+const handle=slider.append("circle").attr("cx",x(year)).attr("cy",SY).attr("r",10.5)
       .attr("fill","#fff").attr("stroke","var(--ink)").attr("stroke-width",2.5)
       .style("cursor","grab");
 const drag=d3.drag().on("start drag",ev=>{stopPlay();setYear(x.invert(ev.x),true);});
@@ -169,19 +270,36 @@ svg.append("text").attr("x",1342).attr("y",FY).attr("font-size",15)
    .attr("fill","var(--soft)").text("Année précédente");
 
 /* ---- rendu d'une année ---- */
-const rowsFor=yy=>(DATA.years[yy]||[]).map(([i,v])=>({i,v,...DATA.names[i]}));
+const rowsFor=yy=>(DATA.years[yy]||[]).map(([i,v],k)=>({i,v,rank:k+1,...DATA.names[i]}));
+function visibleRows(yy){              // filtre Top n + prénom suivi toujours visible
+  const all=rowsFor(yy);
+  const rows=all.slice(0,topN);
+  if(focusI!=null&&!rows.some(d=>d.i===focusI)){
+    const f=all.find(d=>d.i===focusI);
+    if(f)rows.push(f);
+  }
+  return rows;
+}
 const valFS=d=>Math.min(18,Math.max(9,r(d.v)*0.27));
 const showVal=d=>r(d.v)>=24;
 
 /* étiquettes : police réduite pour tenir dans la bulle, puis élagage
-   glouton des chevauchements (les plus grosses bulles sont servies d'abord) */
+   glouton des chevauchements (prénom suivi d'abord, puis grosses bulles) */
 function layoutLabels(rows){
   const out=[];
-  for(const d of rows){
-    const rr=r(d.v);
-    if(rr<14)continue;
-    const fs=Math.min(34,Math.max(9.5,Math.min(rr*0.46,2.05*rr/(0.58*d.n.length))));
-    if(fs*0.58*d.n.length>2.3*rr)continue;          // ne tient pas, même réduit
+  const ordered=focusI==null?rows:
+    [...rows].sort((a,b)=>(b.i===focusI)-(a.i===focusI)||b.v-a.v);
+  for(const d of ordered){
+    const rr=r(d.v),foc=d.i===focusI;
+    if(!foc&&rr<14)continue;
+    const fs=Math.min(34,Math.max(foc?11:9.5,Math.min(rr*0.46,2.05*rr/(0.58*d.n.length))));
+    if(fs*0.58*d.n.length>2.3*rr){
+      if(!foc)continue;                // ne tient pas, même réduit
+      const w=13*0.58*d.n.length;      // prénom suivi : étiquette sombre au-dessus
+      out.push({...d,fs:13,oa:true,
+        b:{x0:x(d.p)-w/2,y0:y(d.l)-rr-22,x1:x(d.p)+w/2,y1:y(d.l)-rr-4}});
+      continue;
+    }
     const h=fs+(showVal(d)?valFS(d)*1.5:0);
     const w=Math.max(fs*0.6*d.n.length,showVal(d)?valFS(d)*0.62*String(d.v).length+4:0);
     const b={x0:x(d.p)-w/2,y0:y(d.l)-h/2,x1:x(d.p)+w/2,y1:y(d.l)+h/2};
@@ -192,26 +310,33 @@ function layoutLabels(rows){
 }
 
 function render(dur){
-  const rows=rowsFor(year).sort((a,b)=>b.v-a.v);
+  const rows=visibleRows(year).sort((a,b)=>b.v-a.v);
   const cur=new Map(rows.map(d=>[d.i,d.v]));
-  const ghosts=[];                       // année précédente : sortie du top, ou taille nettement différente
-  (DATA.years[year-1]||[]).forEach(([i,v])=>{
-    const c=cur.get(i);
-    if(c===undefined||Math.abs(r(c)-r(v))>=3)ghosts.push({i,v,...DATA.names[i]});
-  });
+  const ghosts=[];                     // année précédente : sortie du top n, ou taille nettement différente
+  for(const d of visibleRows(year-1)){
+    if(r(d.v)<10)continue;
+    const c=cur.get(d.i);
+    if(c===undefined||Math.abs(r(c)-r(d.v))>=3)ghosts.push(d);
+  }
   const t=svg.transition().duration(dur).ease(d3.easeCubicOut);
+  const dimmed=i=>focusI!=null&&i!==focusI;
 
   layerB.selectAll("circle").data(rows,d=>d.i)
     .join(e=>e.append("circle")
         .attr("cx",d=>x(d.p)).attr("cy",d=>y(d.l)).attr("r",0)
-        .attr("fill","var(--bubble)").attr("stroke","var(--bg)").attr("stroke-width",1.4)
+        .attr("fill",d=>d.i===focusI?"var(--accent)":"var(--bubble)")
+        .attr("stroke","var(--bg)").attr("stroke-width",1.4)
+        .style("cursor","pointer")
+        .on("click",(ev,d)=>setFocus(d.i===focusI?null:d.i))
         .on("mouseenter",(ev,d)=>{d3.select(ev.currentTarget).attr("stroke","var(--ink)").attr("stroke-width",1.6);showTT(ev,d);})
         .on("mousemove",moveTT)
         .on("mouseleave",ev=>{d3.select(ev.currentTarget).attr("stroke","var(--bg)").attr("stroke-width",1.4);tt.style.opacity=0;}),
       u=>u,
       ex=>ex.transition(t).attr("r",0).remove())
-    .sort((a,b)=>b.v-a.v)               // grosses bulles derrière
-    .transition(t).attr("r",d=>r(d.v));
+    .sort((a,b)=>b.v-a.v)              // grosses bulles derrière
+    .transition(t).attr("r",d=>r(d.v))
+    .attr("fill",d=>d.i===focusI?"var(--accent)":"var(--bubble)")
+    .attr("opacity",d=>dimmed(d.i)?.16:1);
 
   layerG.selectAll("circle").data(ghosts,d=>d.i)
     .join(e=>e.append("circle")
@@ -221,7 +346,7 @@ function render(dur){
       u=>u,
       ex=>ex.transition(t).attr("opacity",0).remove())
     .attr("r",d=>r(d.v))
-    .transition(t).attr("opacity",.9);
+    .transition(t).attr("opacity",d=>dimmed(d.i)?.12:.9);
 
   const lab=layerL.selectAll("g.lbl").data(layoutLabels(rows),d=>d.i)
     .join(e=>{const g=e.append("g").attr("class","lbl")
@@ -232,24 +357,42 @@ function render(dur){
       u=>u,
       ex=>ex.transition(t).attr("opacity",0).remove())
     .order();
-  lab.transition(t).attr("opacity",1);
+  lab.transition(t).attr("opacity",d=>dimmed(d.i)?.15:1);
   lab.select(".nm").text(d=>d.n)
+     .attr("fill",d=>d.oa?"var(--accent-d)":"#fff")
      .transition(t).attr("font-size",d=>d.fs)
-     .attr("y",d=>showVal(d)?-d.fs*0.18:d.fs*0.35);
-  lab.select(".vl").text(d=>showVal(d)?fmt.format(d.v):"")
+     .attr("y",d=>d.oa?-(r(d.v)+9):(showVal(d)?-d.fs*0.18:d.fs*0.35));
+  lab.select(".vl").text(d=>!d.oa&&showVal(d)?fmt.format(d.v):"")
      .transition(t).attr("font-size",valFS)
      .attr("y",d=>valFS(d)*1.25+3);
 
   bigYear.text(year);
   handle.transition(t).attr("cx",x(year));
+  drawSpark();
 }
 
 /* ---- interactions ---- */
 function setYear(v,fast){
   v=Math.round(Math.max(DATA.yearMin,Math.min(DATA.yearMax,v)));
   if(v===year)return;
-  year=v;render(fast?90:430);
+  year=v;render(fast?90:430);writeHash();
 }
+const topn=document.getElementById("topn"),topnv=document.getElementById("topnv");
+const who=document.getElementById("who"),clearBtn=document.getElementById("clear");
+document.getElementById("dl").innerHTML=
+  DATA.names.map((d,i)=>`<option value="${label(i)}"></option>`).join("");
+topn.value=topN;topnv.textContent=topN;
+topn.addEventListener("input",()=>{
+  topN=+topn.value;topnv.textContent=topN;render(140);writeHash();
+});
+function setFocus(i){
+  focusI=i;
+  who.value=i!=null?label(i):"";
+  clearBtn.style.visibility=i!=null?"visible":"hidden";
+  render(280);writeHash();
+}
+who.addEventListener("change",()=>setFocus(resolveName(who.value)));
+clearBtn.addEventListener("click",()=>setFocus(null));
 function togglePlay(){
   if(timer)return stopPlay();
   if(year>=DATA.yearMax){year=DATA.yearMin;render(0);}
@@ -262,8 +405,8 @@ function stopPlay(){
   playIcon.attr("d",ICON_PLAY);playTxt.text("Lecture année par année");
 }
 function showTT(ev,d){
-  tt.innerHTML=`<b>${d.n}</b> <span class="dim">· prénom ${d.s==="F"?"féminin":"masculin"}</span><br>`+
-    `${fmt.format(d.v)} naissances en ${year}<br>`+
+  tt.innerHTML=`<b>${d.n}</b><br>`+
+    `${fmt.format(d.v)} naissances en ${year} <span class="dim">· n° ${d.rank} de l'année</span><br>`+
     `<span class="dim">Pic de popularité : ${d.p} — ${d.l} ans dans le top 100</span>`;
   tt.style.opacity=1;moveTT(ev);
 }
@@ -274,11 +417,19 @@ function moveTT(ev){
   tt.style.left=lx+"px";tt.style.top=ly+"px";
 }
 d3.select(window).on("keydown",ev=>{
+  if(ev.target===who)return;
   if(ev.key==="ArrowRight"){stopPlay();setYear(year+1,true);}
   else if(ev.key==="ArrowLeft"){stopPlay();setYear(year-1,true);}
+  else if(ev.key==="Escape"){setFocus(null);}
 });
-window.viz={setYear:v=>{stopPlay();setYear(v,false);},get year(){return year;}};
+window.viz={
+  setYear:v=>{stopPlay();setYear(v,false);},
+  setTop:v=>{topN=Math.max(1,Math.min(100,Math.round(v)));topn.value=topN;topnv.textContent=topN;render(140);writeHash();},
+  setFocus:s=>setFocus(typeof s==="number"?s:resolveName(s)),
+  get state(){return {year,topN,focus:focusI!=null?label(focusI):null};}
+};
 
+if(focusI!=null){who.value=label(focusI);clearBtn.style.visibility="visible";}
 render(0);
 </script>
 </body>
@@ -288,9 +439,11 @@ render(0);
 # ----------------------------------------------------------------- écriture
 html = (TEMPLATE
         .replace("__DATA__", json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
-        .replace("__YEAR0__", str(YEAR0)))
+        .replace("__YEAR0__", str(YEAR0))
+        .replace("__TOP0__", str(TOP0)))
 
 out = ROOT / "output" / "viz1_bulles.html"
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(html, encoding="utf-8")
-print(f"OK {out.relative_to(ROOT)} ({out.stat().st_size/1024:.0f} Ko)")
+print(f"OK {out.relative_to(ROOT)} ({out.stat().st_size/1024:.0f} Ko, "
+      f"{len(payload['names'])} prénoms, {len(payload['years'])} années)")
