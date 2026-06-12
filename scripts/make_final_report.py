@@ -99,35 +99,51 @@ doc.add_paragraph(
     "Target questions: are some names more popular in some regions, and are popular names "
     "generally popular across the whole country?"
 )
-sub("What it shows")
 doc.add_paragraph(
-    "A two-ring sunburst of where births occur: the inner ring is the region, the outer ring its "
-    "departments, and the angle of each arc is proportional to the number of births. The "
-    "“Decade” slider recomposes the rings decade by decade; hovering a region highlights "
-    "it and fades the rest."
+    "We use two complementary views: a per-name radial chart (the main answer) and a sunburst "
+    "(demographic context).", style=None)
+
+sub("Main view — radial chart of a name's local popularity")
+doc.add_paragraph(
+    "Each department is a fixed-width angular sector, arranged in pseudo-geographic order "
+    "(west on the left, east on the right, north on top), so the layout is always the same and "
+    "recognizable. The radial length of a sector encodes the name's local popularity as a "
+    "frequency — births per thousand in that department — normalized by the national rate, i.e. "
+    "how many times more (or less) common the name is locally than nationally. A fixed dashed "
+    "reference circle marks the national level (×1): a sector reaching beyond the circle means the "
+    "name is over-represented there, inside means under-represented. A name selector (sorted by "
+    "popularity) and a decade slider drive the chart; region codes label the ring and are repeated "
+    "with full names in the legend."
 )
-img("sketches/viz2_sunburst_preview.png", 5.0)
+img("sketches/viz2_radial_demo_ewen.png", 6.0)
 sub("Why it is appropriate and effective")
 bullets([
-    "It gives the geographic structure of the data in one part-to-whole picture: which regions "
-    "and departments carry the most births (e.g. Île-de-France and Rhône-Alpes dominate).",
-    "The decade slider exposes regional shifts over time — the demographic weight of regions "
-    "is not constant across the century.",
-    "Hover-to-highlight makes a single region and its departments easy to isolate and compare.",
-    "It establishes the regional baseline needed to interpret any name: how many births each "
-    "region contributes in the first place.",
+    "Frequency-normalized length removes the population-size bias: Paris (75) is no longer "
+    "automatically ‘biggest’; we compare like with like.",
+    "The fixed ×1 reference circle turns the regional question into a one-glance read: bars beyond "
+    "the circle = locally more popular, bars inside = less.",
+    "It answers both sub-questions directly — a regional name (Breton EWEN) makes the western "
+    "sectors shoot past the circle while everywhere else stays inside; a top national name (EMMA) "
+    "produces near-uniform bars hugging the circle everywhere (popular across the whole country).",
+    "The stable geographic ordering lets the eye learn the layout once and then compare any name; "
+    "the decade slider shows how a name's geography appears, spreads or fades over time.",
 ])
-sub("Honest limitation & complementary view (compare/contrast)")
+
+sub("Complementary view — sunburst of births by region and department")
 doc.add_paragraph(
-    "The sunburst answers “how are births distributed across regions?” but not, on its "
-    "own, “is a given name unusually popular in a region?” To fully answer the regional "
-    "question we pair it with a choropleth map of the location quotient (local share ÷ national "
-    "share) with a name selector and year slider. Together they show that regional names "
-    "(Breton EWEN, Catalan JORDI, Basque-area MAYLIS…) light up locally, whereas top national "
-    "names (EMMA, LUCAS) stay uniform everywhere — which is exactly the second sub-question. "
-    "The sunburst supplies the ‘how big is each region’ context; the choropleth supplies "
-    "the ‘where is this name over-represented’ answer."
+    "The sunburst (inner ring = region, outer ring = departments, angle = number of births, decade "
+    "slider) gives the demographic context the radial chart abstracts away: how many births each "
+    "region actually contributes, and how that weight shifts across decades. It is the "
+    "‘how big is each region’ overview; the radial chart is the ‘where is this name "
+    "over-represented’ detail."
 )
+img("sketches/viz2_sunburst_preview.png", 4.4)
+sub("Key points to demonstrate (screenshots / video)")
+bullets([
+    "Radial chart with a regional name (EWEN/JORDI/MAYLIS) — western/southern sectors past the circle.",
+    "Radial chart with a national name (EMMA/LUCAS) — uniform bars on the reference circle.",
+    "A short clip changing the name in the selector to show the pattern reshaping.",
+])
 
 # ============================================================
 # VIZ 3
@@ -166,9 +182,10 @@ bullets([
 h1("Summary")
 doc.add_paragraph(
     "Each visualization is matched to its question through a deliberate encoding: longevity on an "
-    "axis for time, geographic arcs (plus a location-quotient map) for region, and a diverging "
-    "female-share heatmap for gender. All three follow the same overview + detail-on-demand "
-    "pattern (slider / hover / linked view) and share a consistent, accessible color language."
+    "axis for time, a frequency-normalized radial chart with a national reference circle (plus a "
+    "sunburst for demographic context) for region, and a diverging female-share heatmap for "
+    "gender. All three follow the same overview + detail-on-demand pattern (slider / hover / "
+    "linked view) and share a consistent, accessible color language."
 )
 
 out = "report/Final_Visualizations_Report.docx"

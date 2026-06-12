@@ -20,7 +20,8 @@ chacune à un jeu de questions.
 | Fichier | Question | Description |
 |---|---|---|
 | [`output/viz1_bulles.html`](output/viz1_bulles.html) | **Évolution dans le temps** | Nuage de bulles animé : longévité (Top 100) vs année du pic, taille = naissances, couleur = sexe. Slider « Année ». |
-| [`output/viz2_sunburst_interactif.html`](output/viz2_sunburst_interactif.html) | **Effet régional** | Sunburst région → département des naissances. Slider « Décennie », survol pour isoler une région. |
+| [`output/viz2_radial_prenom.html`](output/viz2_radial_prenom.html) | **Effet régional** | Graphe radial par prénom : secteurs d'égale largeur en ordre pseudo-géographique, longueur = popularité locale rapportée au national (×national), cercle de référence ×1. Sélecteur de prénom + slider décennie. |
+| [`output/viz2_sunburst_interactif.html`](output/viz2_sunburst_interactif.html) | **Effet régional (contexte)** | Vue complémentaire : sunburst région → département des naissances (poids démographique). Slider « Décennie », survol pour isoler une région. |
 | [`output/viz3_genre.html`](output/viz3_genre.html) | **Effet de genre** | Heatmap part féminine des prénoms mixtes par décennie + courbe année par année liée au clic. |
 
 Les `.html` embarquent leurs données agrégées : aucun serveur ni dépendance, double-cliquez pour ouvrir.
@@ -31,7 +32,8 @@ Les `.html` embarquent leurs données agrégées : aucun serveur ni dépendance,
 pip install altair pandas vl-convert-python python-docx
 python scripts/prep_data.py            # agrège data/dpt2020.csv -> data/data_*.csv
 python scripts/build_viz1.py           # -> output/viz1_bulles.html
-python scripts/build_viz2_sunburst.py  # -> output/viz2_sunburst_interactif.html
+python scripts/build_viz2_radial.py    # -> output/viz2_radial_prenom.html  (radial par prénom)
+python scripts/build_viz2_sunburst.py  # -> output/viz2_sunburst_interactif.html  (contexte)
 python scripts/build_viz3.py           # -> output/viz3_genre.html
 ```
 
