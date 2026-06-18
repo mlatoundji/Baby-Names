@@ -133,8 +133,8 @@ nd["ratio"] = (nd.permille / nd.nat_permille).round(3)
 # données embarquées slim (la géo est jointe via lookup pour alléger le HTML)
 val_df = nd[["preusuel", "dpt", "decade", "ratio", "permille", "nat_permille"]]
 # Square root transform for a better scale
-val_df["permille"]=np.sqrt(val_df["permille"])
-val_df["nat_permille"]=np.sqrt(val_df["nat_permille"])
+val_df["permille_sqrt"]=np.sqrt(val_df["permille"])
+val_df["nat_permille_sqrt"]=np.sqrt(val_df["nat_permille"])
 
 # ---------------- préparation anneau région ----------------
 # Number of departments per region
@@ -165,7 +165,7 @@ dec = alt.param(name="decennie", value=DEF_DEC,
                 bind=alt.binding_range(min=1900, max=2020, step=10, name="Décennie  "))
 
 R0, R = 100, 400
-max_permille = val_df["permille"].max()
+max_permille = val_df["permille_sqrt"].max()
 # échelle sur le ratio (×national) : cercle fixe à ×1, pics régionaux vers l'extérieur
 pscale = alt.Scale(
     type="sqrt",
@@ -181,7 +181,7 @@ base = (alt.Chart(val_df).add_params(prenom, dec).transform_filter(flt)
 
 bars = base.mark_arc(stroke="white", strokeWidth=0.5).encode(
     theta=alt.Theta("theta:Q", scale=None), theta2=alt.Theta2("theta2:Q"),
-    radius=alt.Radius("permille:Q", scale=pscale), radius2=alt.value(R0),
+    radius=alt.Radius("permille_sqrt:Q", scale=pscale), radius2=alt.value(R0),
     color=alt.Color("reglabel:N", title="Région (code · nom)",
                     scale=alt.Scale(scheme="tableau20"),
                     legend=alt.Legend(columns=1, symbolLimit=30, labelFontSize=9)),
@@ -196,19 +196,9 @@ bars = base.mark_arc(stroke="white", strokeWidth=0.5).encode(
 # cercle de référence FIXE à ×1 (= niveau national), identique pour tout prénom
 ref_outline = (
     base
-    .mark_arc(
-        theta=0,
-        theta2=2*math.pi,
-        fill=None,
-        stroke="#111",
-        strokeWidth=2,
-        strokeDash=[6,4]
-    )
-    .encode(
-        radius=alt.Radius("nat_permille:Q", scale=pscale)
-    ).transform_aggregate(
-        nat_permille="mean(nat_permille)"
-)
+    .mark_arc(theta=0,theta2=2*math.pi,fill=None,stroke="#111",strokeWidth=2,strokeDash=[6,4])
+    .transform_aggregate(nat_permille_sqrt="mean(nat_permille_sqrt)")
+    .encode(radius=alt.Radius("nat_permille_sqrt:Q", scale=pscale))
 )
 
 reglabels = alt.Chart(reg_df).mark_text(fontSize=8, fontWeight="bold", color="#333").encode(
@@ -216,16 +206,13 @@ reglabels = alt.Chart(reg_df).mark_text(fontSize=8, fontWeight="bold", color="#3
 
 region_ring = (
     alt.Chart(reg_df)
-    .mark_arc(
-        stroke="white",
-        strokeWidth=1
+    .mark_arc(stroke="white",strokeWidth=1
     )
     .encode(
         theta=alt.Theta("theta:Q", scale=None),theta2=alt.Theta2("theta2:Q"),
         radius=alt.value(R0),radius2=alt.value(R0 - 50),
         color=alt.Color("reglabel:N",scale=alt.Scale(scheme="tableau20"),legend=None
         ),
-
         tooltip=[
             alt.Tooltip("reglabel:N", title="Région"),
             alt.Tooltip("num_d:Q", title="Départements")
@@ -233,7 +220,62 @@ region_ring = (
     )
 )
 
-chart = (bars + region_ring + ref_outline + reglabels).properties(
+info_text = (
+    base
+    .transform_aggregate(nat_permille="mean(nat_permille)",decade="max(decade)")
+    .transform_calculate(label="'Décennie : ' + toString(datum.decade)"+" + '\\nPopularité nationale : '"+" + format(datum.nat_permille,'.2f') + ' ‰'")
+    .mark_text(align="left",baseline="top",fontSize=16,lineBreak="\n")
+    .encode(x=alt.value(10),y=alt.value(10),text="label:N")
+)
+
+center_label = (
+    base
+    .transform_aggregate(preusuel="max(preusuel)")
+    .mark_text(fontSize=12,fontWeight="bold",color="#222")
+    .encode(x=alt.value(480),y=alt.value(360),text="preusuel:N")
+)
+
+# Cercles de référence et labels
+GRID_VALUES = [0.01, 0.1, 1, 3, 10, 25, 50, 100]
+CX, CY = 480, 360          # centre du graphique
+LABEL_ANGLE = math.pi / 4  # 45°
+
+rings, labels = [], []
+
+for p in GRID_VALUES:
+    # même transformation que les barres :
+    # permille -> sqrt(permille) -> scale sqrt
+    r = R0 + (R - R0) * math.sqrt(math.sqrt(p) / max_permille)
+    for deg in range(361):
+        a = math.radians(deg)
+        rings.append({
+            "permille": p,
+            "angle": deg,
+            "x": CX + r * math.sin(a),
+            "y": CY - r * math.cos(a)
+        })
+    labels.append({
+        "label": f"{p}‰",
+        "x": CX + (r + 8) * math.sin(LABEL_ANGLE),
+        "y": CY - (r + 8) * math.cos(LABEL_ANGLE)
+    })
+
+rings_df = pd.DataFrame(rings)
+labels_df = pd.DataFrame(labels)
+
+grid_rings = (
+    alt.Chart(rings_df)
+    .mark_line(color="#d0d0d0",strokeWidth=0.7)
+    .encode(x=alt.X("x:Q", scale=None),y=alt.Y("y:Q", scale=None),order="angle:Q",detail=alt.Detail("permille:N"))
+)
+
+grid_labels = (
+    alt.Chart(labels_df)
+    .mark_text(fontSize=9,color="#888",align="left",baseline="middle")
+    .encode(x=alt.X("x:Q", scale=None),y=alt.Y("y:Q", scale=None),text="label:N")
+)
+
+chart = (grid_rings + bars + region_ring + ref_outline + reglabels + info_text + center_label + grid_labels).properties(
     width=960, height=720,
     title=alt.TitleParams(
         "Popularité locale d'un prénom par département (‰ des naissances)",
