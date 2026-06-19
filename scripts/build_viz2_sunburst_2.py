@@ -110,10 +110,10 @@ NAMES = sorted(top_by_dec
 NAMES = [n for n in NAMES if n in set(raw.preusuel)]
 g = raw[raw.preusuel.isin(NAMES)]
 
-dept_tot = raw.groupby(["dpt", "decade"]).nombre.sum().rename("dtot")
-nat_tot = raw.groupby("decade").nombre.sum().rename("gtot")
-nd = g.groupby(["preusuel", "dpt", "decade"]).nombre.sum().rename("n").reset_index()
-nd = nd.merge(dept_tot, on=["dpt", "decade"])
+dept_tot = raw.groupby(["dpt", "annais"]).nombre.sum().rename("dtot")
+nat_tot = raw.groupby("annais").nombre.sum().rename("gtot")
+nd = g.groupby(["preusuel", "dpt", "annais"]).nombre.sum().rename("n").reset_index()
+nd = nd.merge(dept_tot, on=["dpt", "annais"])
 nd["permille"] = (nd.n / nd.dtot * 1000).round(2)
 
 # table géo des départements (95 lignes) — jointe ensuite via transform_lookup
@@ -124,14 +124,14 @@ geo_df = pd.DataFrame([
          reglabel=DEP2CODE[d] + " · " + DEP2REG[d])
     for d in ordered])
 
-name_nat = g.groupby(["preusuel", "decade"]).nombre.sum().rename("n").reset_index()
-name_nat = name_nat.merge(nat_tot, on="decade")
+name_nat = g.groupby(["preusuel", "annais"]).nombre.sum().rename("n").reset_index()
+name_nat = name_nat.merge(nat_tot, on="annais")
 name_nat["nat_permille"] = (name_nat.n / name_nat.gtot * 1000).round(2)
-nd = nd.merge(name_nat[["preusuel", "decade", "nat_permille"]], on=["preusuel", "decade"])
+nd = nd.merge(name_nat[["preusuel", "annais", "nat_permille"]], on=["preusuel", "annais"])
 # ratio local / national (quotient de localisation) : 1 = niveau national
 nd["ratio"] = (nd.permille / nd.nat_permille).round(3)
 # données embarquées slim (la géo est jointe via lookup pour alléger le HTML)
-val_df = nd[["preusuel", "dpt", "decade", "ratio", "permille", "nat_permille"]]
+val_df = nd[["preusuel", "dpt", "annais", "ratio", "permille", "nat_permille"]]
 # Square root transform for a better scale
 val_df["permille_sqrt"]=np.sqrt(val_df["permille"])
 val_df["nat_permille_sqrt"]=np.sqrt(val_df["nat_permille"])
@@ -157,12 +157,12 @@ import sys
 opts = list(raw.groupby("preusuel").nombre.sum().loc[NAMES].sort_values(ascending=False).index)
 DEF_DEC = int(sys.argv[2]) if len(sys.argv) > 2 else 2010
 DEF_NAME = (sys.argv[1] if len(sys.argv) > 1 else
-            name_nat[name_nat.decade == DEF_DEC]
+            name_nat[name_nat.annais == DEF_DEC]
             .sort_values("nat_permille", ascending=False).preusuel.iloc[0])
 prenom = alt.param(name="prenom", value=DEF_NAME,
                    bind=alt.binding_select(options=opts, name="Prénom  "))
-dec = alt.param(name="decennie", value=DEF_DEC,
-                bind=alt.binding_range(min=1900, max=2020, step=10, name="Décennie  "))
+dec = alt.param(name="annee", value=DEF_DEC,
+                bind=alt.binding_range(min=1900, max=2020, step=1, name="Année  "))
 
 R0, R = 100, 400
 max_permille = val_df["permille_sqrt"].max()
@@ -173,7 +173,7 @@ pscale = alt.Scale(
     range=[R0, R]
 )
 
-flt = "datum.preusuel == prenom && datum.decade == decennie"
+flt = "datum.preusuel == prenom && datum.annais == annee"
 hover = alt.selection_point(on="mouseover", fields=["dpt"], empty=False)
 base = (alt.Chart(val_df).add_params(prenom, dec).transform_filter(flt)
         .transform_lookup(lookup="dpt", from_=alt.LookupData(
@@ -222,8 +222,8 @@ region_ring = (
 
 info_text = (
     base
-    .transform_aggregate(nat_permille="mean(nat_permille)",decade="max(decade)")
-    .transform_calculate(label="'Décennie : ' + toString(datum.decade)"+" + '\\nPopularité nationale : '"+" + format(datum.nat_permille,'.2f') + ' ‰'")
+    .transform_aggregate(nat_permille="mean(nat_permille)",annais="max(annais)")
+    .transform_calculate(label="'Année : ' + toString(datum.annais)"+" + '\\nPopularité nationale : '"+" + format(datum.nat_permille,'.2f') + ' ‰'")
     .mark_text(align="left",baseline="top",fontSize=16,lineBreak="\n")
     .encode(x=alt.value(10),y=alt.value(10),text="label:N")
 )
@@ -282,7 +282,7 @@ chart = (grid_rings + bars + region_ring + ref_outline + reglabels + info_text +
         subtitle=["Longueur = popularité locale du prénom rapportée à la moyenne nationale "
                   "(× national). Cercle pointillé = ×1 : au-delà = sur-représenté localement, en deçà = moins.",
                   "Secteurs d'égale largeur, ordonnés géographiquement (ouest à gauche, est à droite). "
-                  "Choisissez le prénom (trié par popularité) et la décennie."],
+                  "Choisissez le prénom (trié par popularité) et l'année'."],
         anchor="start", fontSize=16),
 ).configure_view(stroke=None)
 
