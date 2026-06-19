@@ -20,6 +20,7 @@ import altair as alt
 alt.data_transformers.disable_max_rows()
 
 # ---------------- données ----------------
+print("Loading name data...")
 raw = pd.read_csv("../data/dpt2020.csv", sep=";", dtype=str)
 raw = raw[(raw.preusuel != "_PRENOMS_RARES") & (raw.annais != "XXXX") & (raw.dpt != "XX")]
 raw["nombre"] = raw["nombre"].astype(int)
@@ -47,6 +48,7 @@ raw["region"] = raw.dpt.map(DEP2REG)
 raw = raw[raw.region.notna()]
 
 # ---------------- centroïdes & ordre pseudo-géographique ----------------
+print("Loading geographic data...")
 feats = json.load(open("../data/departements.geojson", encoding="utf-8"))["features"]
 DNAME = {f["properties"]["code"]: f["properties"]["nom"] for f in feats}
 
@@ -101,6 +103,7 @@ reg_df = pd.DataFrame(reg_rows)
 
 # ---------------- métrique fréquentielle (‰) ----------------
 # top 8 de chaque décennie (couvre toutes les époques) + prénoms régionaux marquants
+print("Computing birth ratio...")
 top_by_dec = set()
 for d, grp in raw.groupby("decade"):
     top_by_dec |= set(grp.groupby("preusuel").nombre.sum().sort_values(ascending=False).head(8).index)
@@ -137,6 +140,7 @@ val_df["permille_sqrt"]=np.sqrt(val_df["permille"])
 val_df["nat_permille_sqrt"]=np.sqrt(val_df["nat_permille"])
 
 # ---------------- préparation anneau région ----------------
+print("Region breakdown...")
 # Number of departments per region
 reg_df['num_d'] = [
     len(REGIONS[region][1].split())
@@ -153,6 +157,7 @@ tmp["theta2"] = tmp["theta"] + tmp["width"]
 reg_df = tmp.sort_index()
 
 # ---------------- paramètres interactifs ----------------
+print("Creating visualization...")
 import sys
 opts = list(raw.groupby("preusuel").nombre.sum().loc[NAMES].sort_values(ascending=False).index)
 DEF_DEC = int(sys.argv[2]) if len(sys.argv) > 2 else 2010
@@ -279,10 +284,10 @@ chart = (grid_rings + bars + region_ring + ref_outline + reglabels + info_text +
     width=960, height=720,
     title=alt.TitleParams(
         "Popularité locale d'un prénom par département (‰ des naissances)",
-        subtitle=["Longueur = popularité locale du prénom rapportée à la moyenne nationale "
-                  "(× national). Cercle pointillé = ×1 : au-delà = sur-représenté localement, en deçà = moins.",
-                  "Secteurs d'égale largeur, ordonnés géographiquement (ouest à gauche, est à droite). "
-                  "Choisissez le prénom (trié par popularité) et l'année'."],
+        subtitle=["Longueur = popularité locale du prénom dans un département.",
+                  "Cercle pointillé = moyenne nationale, au-delà = sur-représenté localement, en deçà = moins.",
+                  "Secteurs d'égale largeur représentant un département, ordonnés géographiquement (ouest à gauche, est à droite).",
+                  "Choisissez le prénom (trié par popularité) et l'année."],
         anchor="start", fontSize=16),
 ).configure_view(stroke=None)
 
