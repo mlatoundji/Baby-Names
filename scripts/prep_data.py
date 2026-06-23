@@ -16,10 +16,11 @@ DNAME = {f["properties"]["code"]: f["properties"]["nom"]
 DNAME["20"] = "Corse"
 
 # ============================================================
-# (1) NUAGE DE BULLES — niveau national, prénom sans distinction de sexe
+# (1) NUAGE DE BULLES — niveau national, un prénom = une bulle
 # ============================================================
-# Le sexe n'est pas une variable de la viz : un prénom = une bulle. Les rares
-# prénoms donnés aux deux sexes (Camille, Claude, Dominique, Marie) sont fusionnés.
+# Le sexe ne sépare pas les bulles : les rares prénoms donnés aux deux sexes
+# (Camille, Claude, Dominique, Marie) sont fusionnés. Il sert seulement à
+# COLORER la bulle, via la part de filles de l'année affichée (couleur évolutive).
 nat = raw.groupby(["preusuel", "annais"], as_index=False).nombre.sum()
 # longévité = nb d'années passées dans le Top 100 national (tous prénoms confondus)
 nat["rank"] = nat.groupby("annais").nombre.rank(ascending=False, method="min")
@@ -28,19 +29,41 @@ longevity = (nat[nat["rank"] <= 100].groupby("preusuel").annais.nunique()
 agg = nat.groupby("preusuel").nombre.sum().rename("total").reset_index()
 peak = (nat.loc[nat.groupby("preusuel").nombre.idxmax(),
                 ["preusuel", "annais"]].rename(columns={"annais": "peak_year"}))
-names = agg.merge(longevity, on="preusuel").merge(peak, on="preusuel")
+
+# genre dominant + part de filles (%) de chaque prénom, calculés sur tout l'historique
+sx = (raw.groupby(["preusuel", "sexe"]).nombre.sum()
+         .unstack("sexe", fill_value=0))
+for c in ("F", "M"):
+    if c not in sx:
+        sx[c] = 0
+sx["fpct"] = (sx.F / (sx.F + sx.M) * 100).round().astype(int)
+sx["sex"] = sx.apply(lambda r: "F" if r.F >= r.M else "M", axis=1)
+sexinfo = sx[["sex", "fpct"]].reset_index()
+
+names = (agg.merge(longevity, on="preusuel").merge(peak, on="preusuel")
+            .merge(sexinfo, on="preusuel"))
 names["id"] = names.preusuel
 top = names.sort_values("total", ascending=False).head(250).copy()
 top.to_csv("data/data_viz1_bubbles.csv", index=False)
+
+# part de filles (%) PAR ANNÉE de chaque prénom -> couleur évolutive de la bulle
+yr = (raw.groupby(["preusuel", "annais", "sexe"]).nombre.sum()
+         .unstack("sexe", fill_value=0))
+for c in ("F", "M"):
+    if c not in yr:
+        yr[c] = 0
+yr_fem = ((yr.F / (yr.F + yr.M) * 100).round().astype(int)
+          .rename("fy").reset_index())
 
 # séries année par année : top 100 national de chaque année,
 # pour le filtre « Top 1-100 » côté client (le rang = position dans l'année)
 ts = nat.copy()
 ts["yr_rank"] = ts.groupby("annais").nombre.rank(ascending=False, method="first")
 ts = ts[ts.yr_rank <= 100]
-ts = ts.merge(longevity, on="preusuel").merge(peak, on="preusuel")
+ts = (ts.merge(longevity, on="preusuel").merge(peak, on="preusuel")
+        .merge(yr_fem, on=["preusuel", "annais"]))
 ts["id"] = ts.preusuel
-ts = ts[["id", "preusuel", "annais", "nombre", "longevity", "peak_year"]]
+ts = ts[["id", "preusuel", "annais", "nombre", "longevity", "peak_year", "fy"]]
 ts.to_csv("data/data_viz1_anim.csv", index=False)
 print("Viz1 bubbles:", len(top), "| anim rows:", len(ts), "| prénoms:", ts.id.nunique())
 

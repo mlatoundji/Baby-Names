@@ -69,8 +69,12 @@ doc.add_paragraph(
     "An animated bubble cloud. Each bubble is a name in the selected year: the X-axis is the "
     "name's peak year, the Y-axis is its longevity (the number of years it stayed in the national "
     "Top 100), and bubble area is the number of births that year, on a fixed scale so sizes stay "
-    "comparable from one year to the next. Names are pooled regardless of sex — one bubble per "
-    "name — since the questions concern names, not the child's sex. The year selector is the "
+    "comparable from one year to the next, and each bubble is coloured on a blue→rose diverging "
+    "scale by the share of girls among that name's births in the displayed year. Each name is a "
+    "single bubble (the few unisex names like Camille or Dominique are pooled), and because the "
+    "colour tracks the displayed year it shifts as the slider moves: a name that changed sex over "
+    "time visibly slides from blue to rose, while a genuinely mixed name sits at a muted midpoint. "
+    "The year selector is the "
     "X-axis itself: a handle slides along the time axis (or the ▶ button plays the years in "
     "sequence), while the giant year label and the moving, growing bubbles make the evolution "
     "tangible and a dashed ghost ring recalls each bubble's size the year before. Two filters "
@@ -88,12 +92,19 @@ bullets([
     "passing fad (e.g. Brigitte around 1960, Kevin around 1990).",
     "Temporal trends emerge from scrubbing: the cloud drifts rightward over the century and names "
     "are replaced faster in recent decades, making accelerating turnover visible.",
+    "Colour encodes the share of girls among the name's births in the displayed year on a "
+    "blue→rose diverging scale, so mixed names read as muted and names that changed sex over time "
+    "(Camille, Dominique) visibly shift hue as the slider advances — a fourth, time-varying "
+    "variable at no interaction cost.",
     "Sudden popularity is shown by a bubble that appears and inflates rapidly as the slider "
     "advances, while its low longevity keeps it near the bottom.",
     "The “Top n” filter controls clutter: a low n isolates the dominant names, a high n exposes "
-    "the churn of the long tail without changing the layout.",
-    "Hover tooltips give the exact name, births, rank within the year, peak year and longevity "
-    "for detail on demand.",
+    "the churn of the long tail while keeping the overall structure.",
+    "Dense years stay legible thanks to a light collision layout: bubbles nudge apart instead of "
+    "piling into an unreadable clump, while staying anchored to their true peak-year and longevity "
+    "and kept slightly translucent so buried bubbles still show through.",
+    "Hover tooltips give the exact name, the year's girl/boy share, births, rank within the year, "
+    "peak year and longevity for detail on demand.",
 ])
 sub("Key points to demonstrate (screenshots / video)")
 bullets([
