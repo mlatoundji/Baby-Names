@@ -13,13 +13,15 @@ Reprend les remarques du groupe :
 """
 import json
 import math
+import numpy as np
 import pandas as pd
 import altair as alt
 
 alt.data_transformers.disable_max_rows()
 
 # ---------------- données ----------------
-raw = pd.read_csv("data/dpt2020.csv", sep=";", dtype=str)
+print("Loading name data...")
+raw = pd.read_csv("../data/dpt2020.csv", sep=";", dtype=str)
 raw = raw[(raw.preusuel != "_PRENOMS_RARES") & (raw.annais != "XXXX") & (raw.dpt != "XX")]
 raw["nombre"] = raw["nombre"].astype(int)
 raw["annais"] = raw["annais"].astype(int)
@@ -46,7 +48,8 @@ raw["region"] = raw.dpt.map(DEP2REG)
 raw = raw[raw.region.notna()]
 
 # ---------------- centroïdes & ordre pseudo-géographique ----------------
-feats = json.load(open("data/departements.geojson", encoding="utf-8"))["features"]
+print("Loading geographic data...")
+feats = json.load(open("../data/departements.geojson", encoding="utf-8"))["features"]
 DNAME = {f["properties"]["code"]: f["properties"]["nom"] for f in feats}
 
 
@@ -70,18 +73,24 @@ cx = sum(cent[d][0] for d in deps) / len(deps)
 cy = sum(cent[d][1] for d in deps) / len(deps)
 
 
-def bearing(d):  # 0 = nord, sens horaire
+def dep_bearing(d):
     lon, lat = cent[d]
     return math.atan2(lon - cx, lat - cy) % (2 * math.pi)
 
+def reg_bearing(reg):
+    deps = REGIONS[reg][1].split()
 
-reg_bear = {reg: sum(bearing(d) for d in REGIONS[reg][1].split())
-            / len(REGIONS[reg][1].split()) for reg in REGIONS}
+    lon = sum(cent[d][0] for d in deps) / len(deps)
+    lat = sum(cent[d][1] for d in deps) / len(deps)
+
+    return math.atan2(lon - cx, lat - cy) % (2 * math.pi)
+
+
+reg_bear = {reg: reg_bearing(reg) for reg in REGIONS}
 ordered = []
 for reg in sorted(REGIONS, key=lambda r: reg_bear[r]):
-    for d in sorted(REGIONS[reg][1].split(), key=bearing):
+    for d in sorted(REGIONS[reg][1].split(), key=dep_bearing):
         ordered.append(d)
-
 N = len(ordered)
 W = 2 * math.pi / N
 geo = {d: dict(theta=i * W, theta2=(i + 1) * W) for i, d in enumerate(ordered)}
@@ -94,6 +103,7 @@ reg_df = pd.DataFrame(reg_rows)
 
 # ---------------- métrique fréquentielle (‰) ----------------
 # top 8 de chaque décennie (couvre toutes les époques) + prénoms régionaux marquants
+print("Computing birth ratio...")
 top_by_dec = set()
 for d, grp in raw.groupby("decade"):
     top_by_dec |= set(grp.groupby("preusuel").nombre.sum().sort_values(ascending=False).head(8).index)
@@ -103,10 +113,10 @@ NAMES = sorted(top_by_dec
 NAMES = [n for n in NAMES if n in set(raw.preusuel)]
 g = raw[raw.preusuel.isin(NAMES)]
 
-dept_tot = raw.groupby(["dpt", "decade"]).nombre.sum().rename("dtot")
-nat_tot = raw.groupby("decade").nombre.sum().rename("gtot")
-nd = g.groupby(["preusuel", "dpt", "decade"]).nombre.sum().rename("n").reset_index()
-nd = nd.merge(dept_tot, on=["dpt", "decade"])
+dept_tot = raw.groupby(["dpt", "annais"]).nombre.sum().rename("dtot")
+nat_tot = raw.groupby("annais").nombre.sum().rename("gtot")
+nd = g.groupby(["preusuel", "dpt", "annais"]).nombre.sum().rename("n").reset_index()
+nd = nd.merge(dept_tot, on=["dpt", "annais"])
 nd["permille"] = (nd.n / nd.dtot * 1000).round(2)
 
 # table géo des départements (95 lignes) — jointe ensuite via transform_lookup
@@ -117,32 +127,58 @@ geo_df = pd.DataFrame([
          reglabel=DEP2CODE[d] + " · " + DEP2REG[d])
     for d in ordered])
 
-name_nat = g.groupby(["preusuel", "decade"]).nombre.sum().rename("n").reset_index()
-name_nat = name_nat.merge(nat_tot, on="decade")
+name_nat = g.groupby(["preusuel", "annais"]).nombre.sum().rename("n").reset_index()
+name_nat = name_nat.merge(nat_tot, on="annais")
 name_nat["nat_permille"] = (name_nat.n / name_nat.gtot * 1000).round(2)
-nd = nd.merge(name_nat[["preusuel", "decade", "nat_permille"]], on=["preusuel", "decade"])
+nd = nd.merge(name_nat[["preusuel", "annais", "nat_permille"]], on=["preusuel", "annais"])
 # ratio local / national (quotient de localisation) : 1 = niveau national
 nd["ratio"] = (nd.permille / nd.nat_permille).round(3)
 # données embarquées slim (la géo est jointe via lookup pour alléger le HTML)
-val_df = nd[["preusuel", "dpt", "decade", "ratio", "permille", "nat_permille"]]
+val_df = nd[["preusuel", "dpt", "annais", "ratio", "permille", "nat_permille"]]
+# Square root transform for a better scale
+val_df["permille_sqrt"]=np.sqrt(val_df["permille"])
+val_df["nat_permille_sqrt"]=np.sqrt(val_df["nat_permille"])
+
+# ---------------- préparation anneau région ----------------
+print("Region breakdown...")
+# Number of departments per region
+reg_df['num_d'] = [
+    len(REGIONS[region][1].split())
+    for region in reg_df['region']
+]
+reg_df['reglabel']=reg_df['code'] + " · " + reg_df['region']
+
+#Computation of angular values for each region
+delta = 2 * math.pi / 95
+tmp = reg_df.sort_values("tmid").copy()
+tmp["width"] = tmp["num_d"] * delta
+tmp["theta"] = tmp["width"].cumsum().shift(fill_value=0)
+tmp["theta2"] = tmp["theta"] + tmp["width"]
+reg_df = tmp.sort_index()
 
 # ---------------- paramètres interactifs ----------------
+print("Creating visualization...")
 import sys
 opts = list(raw.groupby("preusuel").nombre.sum().loc[NAMES].sort_values(ascending=False).index)
 DEF_DEC = int(sys.argv[2]) if len(sys.argv) > 2 else 2010
 DEF_NAME = (sys.argv[1] if len(sys.argv) > 1 else
-            name_nat[name_nat.decade == DEF_DEC]
+            name_nat[name_nat.annais == DEF_DEC]
             .sort_values("nat_permille", ascending=False).preusuel.iloc[0])
 prenom = alt.param(name="prenom", value=DEF_NAME,
                    bind=alt.binding_select(options=opts, name="Prénom  "))
-dec = alt.param(name="decennie", value=DEF_DEC,
-                bind=alt.binding_range(min=1900, max=2020, step=10, name="Décennie  "))
+dec = alt.param(name="annee", value=DEF_DEC,
+                bind=alt.binding_range(min=1900, max=2020, step=1, name="Année  "))
 
-R0, R = 55, 175
+R0, R = 100, 400
+max_permille = val_df["permille_sqrt"].max()
 # échelle sur le ratio (×national) : cercle fixe à ×1, pics régionaux vers l'extérieur
-rscale = alt.Scale(type="sqrt", domain=[0, 9], range=[R0, R], clamp=True)
+pscale = alt.Scale(
+    type="sqrt",
+    domain=[0, max_permille],
+    range=[R0, R]
+)
 
-flt = "datum.preusuel == prenom && datum.decade == decennie"
+flt = "datum.preusuel == prenom && datum.annais == annee"
 hover = alt.selection_point(on="mouseover", fields=["dpt"], empty=False)
 base = (alt.Chart(val_df).add_params(prenom, dec).transform_filter(flt)
         .transform_lookup(lookup="dpt", from_=alt.LookupData(
@@ -150,7 +186,7 @@ base = (alt.Chart(val_df).add_params(prenom, dec).transform_filter(flt)
 
 bars = base.mark_arc(stroke="white", strokeWidth=0.5).encode(
     theta=alt.Theta("theta:Q", scale=None), theta2=alt.Theta2("theta2:Q"),
-    radius=alt.Radius("ratio:Q", scale=rscale), radius2=alt.value(R0),
+    radius=alt.Radius("permille_sqrt:Q", scale=pscale), radius2=alt.value(R0),
     color=alt.Color("reglabel:N", title="Région (code · nom)",
                     scale=alt.Scale(scheme="tableau20"),
                     legend=alt.Legend(columns=1, symbolLimit=30, labelFontSize=9)),
@@ -163,25 +199,99 @@ bars = base.mark_arc(stroke="white", strokeWidth=0.5).encode(
 ).add_params(hover)
 
 # cercle de référence FIXE à ×1 (= niveau national), identique pour tout prénom
-ref_outline = alt.Chart(pd.DataFrame({"ratio": [1.0]})).mark_arc(
-    theta=0, theta2=2 * math.pi, fill=None, stroke="#111",
-    strokeWidth=2, strokeDash=[6, 4]).encode(radius=alt.Radius("ratio:Q", scale=rscale))
+ref_outline = (
+    base
+    .mark_arc(theta=0,theta2=2*math.pi,fill=None,stroke="#111",strokeWidth=2,strokeDash=[6,4])
+    .transform_aggregate(nat_permille_sqrt="mean(nat_permille_sqrt)")
+    .encode(radius=alt.Radius("nat_permille_sqrt:Q", scale=pscale))
+)
 
-reglabels = alt.Chart(reg_df).mark_text(fontSize=9, fontWeight="bold", color="#333").encode(
-    theta=alt.Theta("tmid:Q", scale=None), radius=alt.value(R + 14), text="code:N")
+reglabels = alt.Chart(reg_df).mark_text(fontSize=8, fontWeight="bold", color="#333").encode(
+    theta=alt.Theta("tmid:Q", scale=None), radius=alt.value(R0 - 25), text="code:N")
 
-chart = (bars + ref_outline + reglabels).properties(
-    width=560, height=560,
+region_ring = (
+    alt.Chart(reg_df)
+    .mark_arc(stroke="white",strokeWidth=1
+    )
+    .encode(
+        theta=alt.Theta("theta:Q", scale=None),theta2=alt.Theta2("theta2:Q"),
+        radius=alt.value(R0),radius2=alt.value(R0 - 50),
+        color=alt.Color("reglabel:N",scale=alt.Scale(scheme="tableau20"),legend=None
+        ),
+        tooltip=[
+            alt.Tooltip("reglabel:N", title="Région"),
+            alt.Tooltip("num_d:Q", title="Départements")
+        ]
+    )
+)
+
+info_text = (
+    base
+    .transform_aggregate(nat_permille="mean(nat_permille)",annais="max(annais)")
+    .transform_calculate(label="'Année : ' + toString(datum.annais)"+" + '\\nPopularité nationale : '"+" + format(datum.nat_permille,'.2f') + ' ‰'")
+    .mark_text(align="left",baseline="top",fontSize=16,lineBreak="\n")
+    .encode(x=alt.value(10),y=alt.value(10),text="label:N")
+)
+
+center_label = (
+    base
+    .transform_aggregate(preusuel="max(preusuel)")
+    .mark_text(fontSize=12,fontWeight="bold",color="#222")
+    .encode(x=alt.value(480),y=alt.value(360),text="preusuel:N")
+)
+
+# Cercles de référence et labels
+GRID_VALUES = [0.01, 0.1, 1, 3, 10, 25, 50, 100]
+CX, CY = 480, 360          # centre du graphique
+LABEL_ANGLE = math.pi / 4  # 45°
+
+rings, labels = [], []
+
+for p in GRID_VALUES:
+    # même transformation que les barres :
+    # permille -> sqrt(permille) -> scale sqrt
+    r = R0 + (R - R0) * math.sqrt(math.sqrt(p) / max_permille)
+    for deg in range(361):
+        a = math.radians(deg)
+        rings.append({
+            "permille": p,
+            "angle": deg,
+            "x": CX + r * math.sin(a),
+            "y": CY - r * math.cos(a)
+        })
+    labels.append({
+        "label": f"{p}‰",
+        "x": CX + (r + 8) * math.sin(LABEL_ANGLE),
+        "y": CY - (r + 8) * math.cos(LABEL_ANGLE)
+    })
+
+rings_df = pd.DataFrame(rings)
+labels_df = pd.DataFrame(labels)
+
+grid_rings = (
+    alt.Chart(rings_df)
+    .mark_line(color="#d0d0d0",strokeWidth=0.7)
+    .encode(x=alt.X("x:Q", scale=None),y=alt.Y("y:Q", scale=None),order="angle:Q",detail=alt.Detail("permille:N"))
+)
+
+grid_labels = (
+    alt.Chart(labels_df)
+    .mark_text(fontSize=9,color="#888",align="left",baseline="middle")
+    .encode(x=alt.X("x:Q", scale=None),y=alt.Y("y:Q", scale=None),text="label:N")
+)
+
+chart = (grid_rings + bars + region_ring + ref_outline + reglabels + info_text + center_label + grid_labels).properties(
+    width=960, height=720,
     title=alt.TitleParams(
         "Popularité locale d'un prénom par département (‰ des naissances)",
-        subtitle=["Longueur = popularité locale du prénom rapportée à la moyenne nationale "
-                  "(× national). Cercle pointillé = ×1 : au-delà = sur-représenté localement, en deçà = moins.",
-                  "Secteurs d'égale largeur, ordonnés géographiquement (ouest à gauche, est à droite). "
-                  "Choisissez le prénom (trié par popularité) et la décennie."],
+        subtitle=["Longueur = popularité locale du prénom dans un département.",
+                  "Cercle pointillé = moyenne nationale, au-delà = sur-représenté localement, en deçà = moins.",
+                  "Secteurs d'égale largeur représentant un département, ordonnés géographiquement (ouest à gauche, est à droite).",
+                  "Choisissez le prénom (trié par popularité) et l'année."],
         anchor="start", fontSize=16),
 ).configure_view(stroke=None)
 
-chart.save("output/viz2_sunburst_2.html")
+chart.save("../output/viz2_sunburst_2.html")
 print("OK output/viz2_sunburst_2.html | prénoms:", len(opts), "| lignes:", len(nd))
-chart.save("sketches/viz2_sunburst_2_preview.png", scale_factor=2.6)
+chart.save("../sketches/viz2_sunburst_2_preview.png", scale_factor=2)
 print("OK sketches/viz2_sunburst_2_preview.png")
