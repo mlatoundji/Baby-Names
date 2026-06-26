@@ -10,19 +10,17 @@ chacune à un jeu de questions.
 .
 ├── data/        # données sources + tables agrégées (dpt2020.csv non versionné)
 ├── scripts/     # préparation des données et génération des visualisations
-├── output/      # visualisations interactives (HTML autonomes)
-├── sketches/    # esquisses de design + aperçus PNG
-└── report/      # rapports (design sketches, post final)
+├── sketches/    # aperçus PNG (non versionnés)
+└── output/      # visualisations interactives (HTML autonomes)
 ```
 
 ## Visualisations (HTML autonomes, à ouvrir dans un navigateur)
 
-| Fichier | Question | Description |
-|---|---|---|
-| [`output/viz1_bulles.html`](output/viz1_bulles.html) | **Évolution dans le temps** | Nuage de bulles animé : longévité (Top 100) vs année du pic, taille = naissances. Slider « Année », filtres Top n et « Suivre un prénom ». |
-| [`output/viz2_sunburst_2.html`](output/viz2_sunburst_2.html) | **Effet régional** | Graphe radial par prénom : secteurs d'égale largeur en ordre pseudo-géographique, longueur = popularité locale rapportée au national (×national), cercle de référence ×1. Sélecteur de prénom + slider décennie. |
-| [`output/viz2_sunburst_1.html`](output/viz2_sunburst_1.html) | **Effet régional (contexte)** | Vue complémentaire : sunburst région → département des naissances (poids démographique). Slider « Décennie », survol pour isoler une région. |
-| [`output/viz3_violon.html`](output/viz3_violon.html) | **Effet de genre** | Violons split garçons/filles par prénom mixte : distribution des naissances dans le temps, un violon par prénom (moitiés décalées = bascule de genre). |
+| Fichier                                                      | Question                    | Description                                                                                                                                                                                                      |
+| ------------------------------------------------------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`output/viz1_bulles.html`](output/viz1_bulles.html)         | **Évolution dans le temps** | Nuage de bulles animé : longévité (Top 100) vs année du pic, taille = naissances. Slider « Année », filtres Top n et « Suivre un prénom ».                                                                       |
+| [`output/viz2_sunburst_2.html`](output/viz2_sunburst_2.html) | **Effet régional**          | Graphe radial par prénom : secteurs d'égale largeur en ordre pseudo-géographique, longueur = popularité locale rapportée au national (×national), cercle de référence ×1. Sélecteur de prénom + slider décennie. |
+| [`output/viz3_violon.html`](output/viz3_violon.html)         | **Effet de genre**          | Violons split garçons/filles par prénom mixte : distribution des naissances dans le temps, un violon par prénom (moitiés décalées = bascule de genre).                                                           |
 
 Les `.html` embarquent leurs données agrégées : aucun serveur ni dépendance, double-cliquez pour ouvrir.
 
@@ -33,7 +31,6 @@ pip install altair pandas vl-convert-python python-docx
 python scripts/prep_data.py            # agrège data/dpt2020.csv -> data/data_*.csv
 python scripts/build_viz1.py           # -> output/viz1_bulles.html
 python scripts/build_viz2_sunburst_2.py    # -> output/viz2_sunburst_2.html  (radial par prénom)
-python scripts/build_viz2_sunburst_1.py  # -> output/viz2_sunburst_1.html  (contexte)
 python scripts/build_viz3_violon.py           # -> output/viz3_violon.html
 ```
 
@@ -46,6 +43,5 @@ python scripts/build_viz3_violon.py           # -> output/viz3_violon.html
 
 ## Conception & rapports
 
-- `report/discussion_designs.md` — esquisses et analyse forces/faiblesses.
-- `report/Baby_Names_Designs_Report.docx` — rapport des designs (forces/faiblesses).
-- `report/Final_Visualizations_Report.docx` — post final : présentation et justification des 3 viz.
+- Détails dans le post sur Moodle
+
