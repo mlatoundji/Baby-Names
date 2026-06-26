@@ -9,3 +9,12 @@ Thumbs.db
 
 # Config locale Claude Code
 .claude/
+
+# Export images
+*.png
+*.jpeg
+*.txt
+
+# Dev folder
+report/
+sketches/
